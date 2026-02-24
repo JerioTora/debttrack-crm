@@ -732,12 +732,56 @@ function updateRem(){
 }
 
 // ══════════════════════════════════════════════
+// REALTIME
+// ══════════════════════════════════════════════
+function setupRealtime(){
+  _supa.channel('crm-realtime')
+    .on('postgres_changes',{event:'*',schema:'public',table:'customers'},async()=>{
+      const {data}=await _supa.from('customers').select('*').order('name');
+      _customers=data||[];
+      render();
+    })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'logs'},async(payload)=>{
+      const l=payload.new;
+      // only update cache if not already added by current user
+      const cid=l.customer_id;
+      const exists=(_logs[cid]||[]).some(x=>x.id===l.id);
+      if(!exists){
+        if(!_logs[cid])_logs[cid]=[];
+        _logs[cid].push({id:l.id,date:l.date,stage:l.stage,note:l.note,amount:l.amount});
+        render();
+      }
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'logs'},async(payload)=>{
+      const l=payload.new;const cid=l.customer_id;
+      _logs[cid]=(_logs[cid]||[]).map(x=>x.id===l.id?{id:l.id,date:l.date,stage:l.stage,note:l.note,amount:l.amount}:x);
+      render();
+    })
+    .on('postgres_changes',{event:'DELETE',schema:'public',table:'logs'},async(payload)=>{
+      const l=payload.old;const cid=l.customer_id;
+      _logs[cid]=(_logs[cid]||[]).filter(x=>x.id!==l.id);
+      render();
+    })
+    .on('postgres_changes',{event:'*',schema:'public',table:'notes'},async(payload)=>{
+      const n=payload.new;
+      if(n)_notes[n.customer_id]=n.content;
+      render();
+    })
+    .subscribe((status)=>{
+      if(status==='SUBSCRIBED'){
+        console.log('Realtime connected ✓');
+      }
+    });
+}
+
+// ══════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════
 (async()=>{
   document.getElementById('main').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:60vh;flex-direction:column;gap:12px;color:var(--text3)"><div style="font-size:32px">⏳</div><div style="font-size:14px">Đang tải dữ liệu...</div></div>';
   try{
     await loadAll();
+    setupRealtime();
   }catch(err){
     toast('Lỗi kết nối Supabase: '+err.message,'err');
   }
