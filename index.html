@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DebtTrack CRM</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Fraunces:ital,wght@0,300;0,600;0,700;1,300&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg:#F5F2ED;--surface:#FFF;--surface2:#F0EDE8;--border:#E2DDD6;
+    --text:#1A1714;--text2:#6B6560;--text3:#9E9892;
+    --accent:#C84B2F;--green:#2D6A4F;--green-bg:#D8F3DC;
+    --yellow:#B5670A;--yellow-bg:#FFF3CD;--red:#C0392B;--red-bg:#FDECEA;
+    --blue:#1A4E8C;--blue-bg:#DBEAFE;--purple:#5B2D8E;--purple-bg:#EDE9FE;
+    --orange-bg:#FEE8E2;--shadow:0 1px 3px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.04);
+    --shadow-lg:0 8px 32px rgba(0,0,0,.12);--r:10px;--rl:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Instrument Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+  button{cursor:pointer;border:none;font-family:inherit;transition:all .15s}
+  button:hover{opacity:.85}button:active{transform:scale(.98)}
+  input,textarea,select{font-family:inherit;outline:none}
+  .app{display:flex;height:100vh;overflow:hidden}
+  .sidebar{width:240px;background:var(--text);color:#fff;display:flex;flex-direction:column;flex-shrink:0}
+  .sb-logo{padding:28px 24px 20px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .sb-logo .title{font-family:'Fraunces',serif;font-size:22px;font-weight:700;letter-spacing:-.5px}
+  .sb-logo .sub{font-size:11px;color:rgba(255,255,255,.4);margin-top:3px;text-transform:uppercase;letter-spacing:1px}
+  .sb-nav{padding:16px 12px;flex:1}
+  .nav-item{padding:10px 14px;border-radius:8px;cursor:pointer;font-size:13.5px;font-weight:500;color:rgba(255,255,255,.6);display:flex;align-items:center;gap:10px;margin-bottom:2px;transition:all .15s}
+  .nav-item:hover{background:rgba(255,255,255,.08);color:#fff}
+  .nav-item.active{background:var(--accent);color:#fff}
+  .sb-footer{padding:16px 12px;border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:6px}
+  .sb-btn{padding:9px 14px;border-radius:8px;font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;width:100%;background:rgba(255,255,255,.08);color:rgba(255,255,255,.7)}
+  .main{flex:1;overflow:auto;display:flex;flex-direction:column}
+  .topbar{padding:20px 32px 0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+  .page-title{font-family:'Fraunces',serif;font-size:28px;font-weight:600;letter-spacing:-.5px}
+  .page-sub{font-size:13px;color:var(--text2);margin-top:3px}
+  .content{padding:24px 32px 32px;flex:1}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);box-shadow:var(--shadow)}
+  .card-title{font-size:14px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+  /* STATS */
+  .stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:18px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--rl) var(--rl) 0 0}
+  .stat-card.s0::before{background:var(--text3)}.stat-card.s1::before{background:#3B82F6}
+  .stat-card.s2::before{background:#F59E0B}.stat-card.s3::before{background:var(--accent)}
+  .stat-card.s4::before{background:var(--green)}
+  .stat-num{font-family:'Fraunces',serif;font-size:32px;font-weight:700;line-height:1;margin-bottom:6px}
+  .stat-label{font-size:12px;color:var(--text2);font-weight:500}
+  .stat-sub{font-size:11px;color:var(--text3);margin-top:3px}
+  /* KANBAN */
+  .kanban{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;align-items:start}
+  .kb-col{background:var(--surface2);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden}
+  .kb-head{padding:12px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+  .kb-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .kb-count{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px}
+  .kb-body{padding:8px;display:flex;flex-direction:column;gap:7px;min-height:60px}
+  .kb-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:11px 13px;cursor:pointer;transition:all .15s;box-shadow:var(--shadow)}
+  .kb-card:hover{border-color:#E8956D;transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+  .kc-name{font-size:12.5px;font-weight:600;margin-bottom:3px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+  .kc-debt{font-size:13px;font-weight:700;color:var(--accent);margin-bottom:5px}
+  .kc-days{font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;display:inline-block}
+  .s0 .kb-title{color:var(--text2)}.s0 .kb-count{background:var(--surface);color:var(--text2)}.s0 .kb-head{border-top:3px solid var(--text3)}
+  .s1 .kb-title{color:var(--blue)}.s1 .kb-count{background:var(--blue-bg);color:var(--blue)}.s1 .kb-head{border-top:3px solid #3B82F6}
+  .s2 .kb-title{color:var(--yellow)}.s2 .kb-count{background:var(--yellow-bg);color:var(--yellow)}.s2 .kb-head{border-top:3px solid #F59E0B}
+  .s3 .kb-title{color:var(--accent)}.s3 .kb-count{background:var(--orange-bg);color:var(--accent)}.s3 .kb-head{border-top:3px solid var(--accent)}
+  .s4 .kb-title{color:var(--purple)}.s4 .kb-count{background:var(--purple-bg);color:var(--purple)}.s4 .kb-head{border-top:3px solid var(--purple)}
+  .s5 .kb-title{color:var(--green)}.s5 .kb-count{background:var(--green-bg);color:var(--green)}.s5 .kb-head{border-top:3px solid var(--green)}
+  /* LIST */
+  .list-controls{display:flex;gap:12px;margin-bottom:20px}
+  .search-wrap{flex:1;position:relative}
+  .search-wrap input{width:100%;padding:10px 16px 10px 40px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);font-size:14px;color:var(--text)}
+  .search-wrap input:focus{border-color:var(--accent)}
+  .search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text3)}
+  .fsel{padding:10px 14px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface);font-size:13px;color:var(--text);min-width:160px}
+  .fsel:focus{border-color:var(--accent)}
+  .ctable{width:100%;border-collapse:collapse}
+  .ctable th{padding:10px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);background:var(--surface2)}
+  .ctable td{padding:13px 16px;font-size:13.5px;border-bottom:1px solid var(--border)}
+  .ctable tr:last-child td{border-bottom:none}
+  .ctable tr{cursor:pointer;transition:background .1s}
+  .ctable tr:hover td{background:var(--surface2)}
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+  /* DETAIL */
+  .back{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);cursor:pointer;margin-bottom:20px;width:fit-content;padding:6px 0}
+  .back:hover{color:var(--text)}
+  .dgrid{display:grid;grid-template-columns:340px 1fr;gap:20px}
+  .avatar{width:52px;height:52px;border-radius:12px;background:var(--text);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:22px;font-weight:700;margin-bottom:14px}
+  .cname-big{font-family:'Fraunces',serif;font-size:20px;font-weight:600;letter-spacing:-.3px}
+  .irow{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border);font-size:13.5px}
+  .irow:last-child{border-bottom:none}
+  .ilabel{color:var(--text2);font-size:13px}
+  .debt-big{font-family:'Fraunces',serif;font-size:26px;font-weight:700;color:var(--accent)}
+  /* FORM */
+  .flabel{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+  .sbtns{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px}
+  .sbtn{padding:7px 13px;border-radius:8px;font-size:12px;font-weight:500;border:1.5px solid var(--border);background:var(--surface);color:var(--text2);transition:all .15s}
+  .sbtn:hover{border-color:var(--accent);color:var(--accent);opacity:1}
+  .sbtn.sel{color:#fff;border-color:transparent}
+  .fi{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--surface);font-size:13.5px;color:var(--text);margin-bottom:14px}
+  .fi:focus{border-color:var(--accent)}
+  .fi::placeholder{color:var(--text3)}
+  textarea.fi{resize:vertical;min-height:80px}
+  .rem{padding:12px 16px;border-radius:var(--r);margin-bottom:14px;font-size:13px;border:1px solid}
+  .rem.pos{background:var(--red-bg);border-color:#FECACA;color:var(--red)}
+  .rem.zero{background:var(--green-bg);border-color:#A7F3D0;color:var(--green)}
+  .sub-btn{width:100%;padding:12px;border-radius:var(--r);background:var(--text);color:#fff;font-size:14px;font-weight:600}
+  .sub-btn:hover{background:var(--accent);opacity:1}
+  /* TIMELINE */
+  .tl-empty{text-align:center;padding:40px 0;color:var(--text3);font-size:13px}
+  .tl-item{display:flex;gap:14px;margin-bottom:16px}
+  .tl-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
+  .tl-body{flex:1;background:var(--surface2);border-radius:var(--r);padding:12px 14px;border:1px solid var(--border)}
+  .tl-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+  .tl-action{font-size:13px;font-weight:600}
+  .tl-date{font-size:12px;color:var(--text3)}
+  .tl-note{font-size:13px;color:var(--text2);line-height:1.5;margin-top:4px}
+  .tl-amount{font-size:13px;font-weight:600;color:var(--green);margin-top:3px}
+  .tl-btns{display:flex;gap:8px;margin-top:8px}
+  .tl-btn{font-size:11px;padding:3px 10px;border-radius:6px;font-weight:500;background:var(--surface);border:1px solid var(--border);color:var(--text2)}
+  .tl-btn:hover{opacity:1;border-color:var(--accent);color:var(--accent)}
+  .tl-btn.del:hover{border-color:var(--red);color:var(--red)}
+  /* MODAL */
+  .overlay{position:fixed;inset:0;background:rgba(26,23,20,.5);backdrop-filter:blur(6px);z-index:100;display:flex;align-items:center;justify-content:center}
+  .modal{background:var(--surface);border-radius:var(--rl);padding:28px;width:480px;max-width:95vw;box-shadow:var(--shadow-lg);border:1px solid var(--border);animation:mIn .2s ease}
+  @keyframes mIn{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
+  .modal-title{font-family:'Fraunces',serif;font-size:20px;font-weight:600;margin-bottom:20px}
+  .mbtns{display:flex;gap:10px;margin-top:20px}
+  .mbtn{flex:1;padding:11px;border-radius:var(--r);font-size:14px;font-weight:600}
+  .mbtn.cancel{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
+  .mbtn.ok{background:var(--text);color:#fff}
+  .mbtn.ok:hover{background:var(--accent);opacity:1}
+  .mbtn.danger{background:var(--red);color:#fff}
+  /* TOAST */
+  .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:100px;font-size:13.5px;font-weight:500;z-index:200;box-shadow:var(--shadow-lg);animation:tIn .3s ease;white-space:nowrap}
+  @keyframes tIn{from{opacity:0;transform:translate(-50%,16px)}to{opacity:1;transform:translate(-50%,0)}}
+  /* IMPORT */
+  .izone{border:2px dashed var(--border);border-radius:var(--rl);padding:40px;text-align:center;cursor:pointer;transition:all .15s;background:var(--surface2)}
+  .izone:hover,.izone.drag{border-color:var(--accent);background:var(--orange-bg)}
+  .ptable{width:100%;border-collapse:collapse;font-size:13px}
+  .ptable th{padding:8px 12px;background:var(--surface2);border:1px solid var(--border);font-weight:600;font-size:11px;text-transform:uppercase;color:var(--text2)}
+  .ptable td{padding:8px 12px;border:1px solid var(--border)}
+  .ptable tr.new td{background:#F0FDF4}.ptable tr.update td{background:#FFFBEB}
+  .pbadge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px}
+  .pbadge.new{background:var(--green-bg);color:var(--green)}
+  .pbadge.update{background:var(--yellow-bg);color:var(--yellow)}
+  .pbadge.keep{background:var(--surface2);color:var(--text3)}
+  .empty{text-align:center;padding:60px 20px;color:var(--text3)}
+  .empty-icon{font-size:40px;margin-bottom:12px}
+  .empty-title{font-size:16px;font-weight:600;color:var(--text2);margin-bottom:6px}
+  .mt16{margin-top:16px}
+  .p24{padding:24px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="sb-logo"><div class="title">DebtTrack</div><div class="sub">Mini CRM · Công nợ</div></div>
+    <nav class="sb-nav">
+      <div class="nav-item active" onclick="nav('dashboard')" id="nav-dashboard"><span>📊</span> Tổng quan</div>
+      <div class="nav-item" onclick="nav('customers')" id="nav-customers"><span>👥</span> Khách hàng</div>
+      <div class="nav-item" onclick="nav('import')" id="nav-import"><span>📥</span> Import Xero</div>
+    </nav>
+    <div class="sb-footer">
+      <button class="sb-btn" onclick="exportBackup()">💾 Backup JSON</button>
+      <label class="sb-btn" style="cursor:pointer">📂 Restore JSON<input type="file" accept=".json" onchange="importBackup(event)" style="display:none"></label>
+      <button class="sb-btn" onclick="exportCSV()">📤 Xuất CSV</button>
+    </div>
+  </div>
+  <div class="main" id="main"></div>
+</div>
+<div id="toast" class="toast" style="display:none"></div>
+<div id="mroot"></div>
+<script>
+// ══════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════
+const STAGES=[
+  {id:'none',  label:'Chưa xử lý',         icon:'📌',color:'#6B6560',bg:'#F0EDE8',dot:'#9E9892'},
+  {id:'sms1',  label:'Nhắn tin lần 1',      icon:'💬',color:'#1A4E8C',bg:'#DBEAFE',dot:'#3B82F6'},
+  {id:'sms2',  label:'Nhắn tin lần 2',      icon:'💬',color:'#B5670A',bg:'#FFF3CD',dot:'#F59E0B'},
+  {id:'report',label:'Báo cho sale',         icon:'📋',color:'#C84B2F',bg:'#FEE8E2',dot:'#C84B2F'},
+  {id:'called',label:'Sale đã gọi điện đòi',icon:'📞',color:'#5B2D8E',bg:'#EDE9FE',dot:'#7C3AED'},
+  {id:'paid',  label:'Đã thanh toán',        icon:'✅',color:'#2D6A4F',bg:'#D8F3DC',dot:'#10B981'},
+];
+
+// ══════════════════════════════════════════════
+// STORAGE (localStorage kept for backup/restore JSON only)
+// ══════════════════════════════════════════════
+
+// ══════════════════════════════════════════════
+// SUPABASE INIT
+// ══════════════════════════════════════════════
+const _supa = supabase.createClient(
+  'https://uvlcjshgtturglciejsm.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2bGNqc2hndHR1cmdsY2llanNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5Mzg1MzcsImV4cCI6MjA4NzUxNDUzN30.410WrHmNz00MwBJCJSN3xTDW0rpjNOgo5XJewYZf1ck'
+);
+
+// ══════════════════════════════════════════════
+// CACHE (in-memory, refreshed on load)
+// ══════════════════════════════════════════════
+let _customers = [];
+let _logs = {};      // {customer_id: [log, ...]}
+let _notes = {};     // {customer_id: content}
+let _loaded = false;
+
+async function loadAll() {
+  const [cRes, lRes, nRes] = await Promise.all([
+    _supa.from('customers').select('*').order('name'),
+    _supa.from('logs').select('*').order('created_at'),
+    _supa.from('notes').select('*'),
+  ]);
+  _customers = cRes.data || [];
+  _logs = {};
+  (lRes.data || []).forEach(l => {
+    if (!_logs[l.customer_id]) _logs[l.customer_id] = [];
+    _logs[l.customer_id].push({
+      id: l.id,
+      date: l.date,
+      stage: l.stage,
+      note: l.note,
+      amount: l.amount,
+    });
+  });
+  _notes = {};
+  (nRes.data || []).forEach(n => { _notes[n.customer_id] = n.content; });
+  _loaded = true;
+}
+
+// Sync wrappers — all async, update cache then re-render
+const loadC = () => _customers;
+const loadL = () => _logs;
+const loadN = () => _notes;
+
+async function saveC(data) { _customers = data; }
+
+async function dbUpsertCustomer(c) {
+  await _supa.from('customers').upsert({
+    id: c.id, name: c.name, debt: c.debt,
+    import_date: c.importDate||null,
+    updated_date: c.updatedDate||null,
+  }, {onConflict: 'id'});
+}
+
+async function dbInsertLog(cid, entry) {
+  const { data } = await _supa.from('logs').insert({
+    id: entry.id,
+    customer_id: cid,
+    date: entry.date,
+    stage: entry.stage,
+    note: entry.note||null,
+    amount: entry.amount||null,
+  }).select().single();
+  if (!_logs[cid]) _logs[cid] = [];
+  _logs[cid].push(entry);
+}
+
+async function dbUpdateLog(cid, logId, fields) {
+  await _supa.from('logs').update({
+    stage: fields.stage,
+    date: fields.date,
+    amount: fields.amount||null,
+    note: fields.note||null,
+  }).eq('id', logId);
+  _logs[cid] = (_logs[cid]||[]).map(l => l.id===logId ? {...l,...fields} : l);
+}
+
+async function dbDeleteLog(cid, logId) {
+  await _supa.from('logs').delete().eq('id', logId);
+  _logs[cid] = (_logs[cid]||[]).filter(l => l.id !== logId);
+}
+
+async function dbSaveNote(cid, content) {
+  await _supa.from('notes').upsert({customer_id: cid, content, updated_at: new Date().toISOString()}, {onConflict: 'customer_id'});
+  _notes[cid] = content;
+}
+
+// ══════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════
+function getStage(id){
+  const l=(loadL()[id]||[]);
+  return l.length?l[l.length-1].stage:'none';
+}
+function getSC(id){return STAGES.find(s=>s.id===id)||STAGES[0]}
+function getEffDebt(c){
+  const today=dStr(new Date());
+  const paid=(loadL()[c.id]||[])
+    .filter(l=>l.date===today&&l.stage==='paid'&&l.amount)
+    .reduce((s,l)=>s+(l.amount||0),0);
+  return Math.max(0,Math.floor(c.debt-paid));
+}
+function fmtM(n){
+  if(n===null||n===undefined)return'—';
+  n=Math.floor(n);
+  if(n>=1e9)return(Math.floor(n/1e9*100)/100)+' tỷ';
+  if(n>=1e6)return(Math.floor(n/1e6*100)/100)+' tr';
+  return n.toLocaleString('vi-VN')+' $';
+}
+function fmtD(s){
+  if(!s)return'—';
+  const d=new Date(s);
+  return isNaN(d)?s:d.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function dStr(d){return d.toISOString().slice(0,10)}
+function today(){return dStr(new Date())}
+function daysSince(id){
+  const l=(loadL()[id]||[]);
+  if(!l.length)return null;
+  const lastDate=l[l.length-1].date;
+  if(lastDate===today())return 0;
+  const diff=Math.floor((new Date(today())-new Date(lastDate))/86400000);
+  return Math.max(0,diff);
+}
+
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+let view='dashboard', prevView='dashboard', selId=null, prevData=null, editId=null;
+const fs={stage:null,date:today(),amount:'',note:''};
+const ls2={search:'',filter:'all',sort:'debt',dir:-1};
+
+// ══════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════
+function nav(v,id){
+  if(v==='detail') prevView=view;
+  view=v; if(id)selId=id;
+  if(v!=='detail'){fs.stage=null;fs.amount='';fs.note='';fs.date=today();editId=null;}
+  document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
+  const k=v==='detail'?prevView:v;
+  document.getElementById('nav-'+k)?.classList.add('active');
+  render();
+}
+function render(){
+  const m=document.getElementById('main');
+  if(view==='dashboard')m.innerHTML=rDash();
+  else if(view==='customers')m.innerHTML=rList();
+  else if(view==='detail')m.innerHTML=rDetail();
+  else if(view==='import')m.innerHTML=rImport();
+  bind();
+}
+
+// ══════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════
+function rDash(){
+  const C=loadC();
+  if(!C.length)return`<div class="topbar"><div><div class="page-title">Tổng quan</div></div></div><div class="content"><div class="empty"><div class="empty-icon">📥</div><div class="empty-title">Chưa có dữ liệu</div><div class="empty-sub">Vào <strong>Import Xero</strong> để bắt đầu</div></div></div>`;
+  const t=today();
+  const active=C.filter(c=>getStage(c.id)!=='paid');
+  const paidToday=C.filter(c=>(loadL()[c.id]||[]).some(l=>l.stage==='paid'&&l.date===t));
+  const sc={};STAGES.forEach(s=>sc[s.id]=0);
+  active.forEach(c=>sc[getStage(c.id)]++);
+  const totalDebt=active.reduce((s,c)=>s+getEffDebt(c),0);
+  const L_all=loadL();
+  const paidTodayAmt=paidToday.reduce((s,c)=>s+(L_all[c.id]||[]).filter(l=>l.stage==='paid'&&l.date===t&&l.amount).reduce((a,l)=>a+(l.amount||0),0),0);
+
+  const stats=`<div class="stats-grid">
+    <div class="stat-card s0"><div class="stat-num">${sc.none}</div><div class="stat-label">Chưa xử lý</div><div class="stat-sub">Cần bắt đầu</div></div>
+    <div class="stat-card s1"><div class="stat-num">${sc.sms1+sc.sms2}</div><div class="stat-label">Đang nhắn tin</div><div class="stat-sub">L1:${sc.sms1} · L2:${sc.sms2}</div></div>
+    <div class="stat-card s2"><div class="stat-num">${sc.report+sc.called}</div><div class="stat-label">Sale xử lý</div><div class="stat-sub">Báo:${sc.report} · Gọi:${sc.called}</div></div>
+    <div class="stat-card s3"><div class="stat-num" style="font-size:22px">${fmtM(totalDebt)}</div><div class="stat-label">Tổng dư nợ</div><div class="stat-sub">${active.length} khách chưa thu</div></div>
+    <div class="stat-card s4"><div class="stat-num">${paidToday.length}</div><div class="stat-label">Thanh toán hôm nay</div><div class="stat-sub">${fmtM(paidTodayAmt)}</div></div>
+  </div>`;
+
+  const cols=STAGES.slice(0,5).map((st,i)=>{
+    let cc=active.filter(c=>getStage(c.id)===st.id);if(st.id==='none')cc=cc.slice().sort((a,b)=>getEffDebt(b)-getEffDebt(a));
+    const cards=cc.length?cc.map(c=>{
+      const d=daysSince(c.id);
+      const stale=d!==null&&d>3;
+      const dh=d!==null?`<span class="kc-days" style="background:${stale?'#FEE8E2':'#F0EDE8'};color:${stale?'#C84B2F':'#6B6560'}">${d===0?'Hôm nay':d+'n trước'}</span>`:`<span class="kc-days" style="background:#F0EDE8;color:#9E9892">Mới</span>`;
+      return`<div class="kb-card" onclick="nav('detail','${c.id}')"><div class="kc-name">${c.name}</div><div class="kc-debt">${fmtM(getEffDebt(c))}</div>${dh}</div>`;
+    }).join(''):`<div style="padding:12px;text-align:center;font-size:12px;color:var(--text3)">Không có</div>`;
+    return`<div class="kb-col s${i}"><div class="kb-head"><span class="kb-title">${st.label}</span><span class="kb-count">${cc.length}</span></div><div class="kb-body">${cards}</div></div>`;
+  });
+
+  // paid today col
+  const ptCards=paidToday.length?paidToday.map(c=>`<div class="kb-card" onclick="nav('detail','${c.id}')"><div class="kc-name">${c.name}</div><div class="kc-debt" style="color:var(--green)">${fmtM(getEffDebt(c))}</div><span class="kc-days" style="background:var(--green-bg);color:var(--green)">Hôm nay</span></div>`).join(''):`<div style="padding:12px;text-align:center;font-size:12px;color:var(--text3)">Không có</div>`;
+  cols.push(`<div class="kb-col s5"><div class="kb-head"><span class="kb-title">Đã thanh toán</span><span class="kb-count">${paidToday.length}</span></div><div class="kb-body">${ptCards}</div></div>`);
+
+  return`<div class="topbar"><div><div class="page-title">Tổng quan</div><div class="page-sub">${new Date().toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})}</div></div></div><div class="content">${stats}<div class="kanban">${cols.join('')}</div></div>`;
+}
+
+// ══════════════════════════════════════════════
+// CUSTOMERS LIST
+// ══════════════════════════════════════════════
+function rList(){
+  const C=loadC();
+  const {search,filter}=ls2;
+  let filtered=C.filter(c=>{
+    const ms=!search||c.name.toLowerCase().includes(search.toLowerCase());
+    const mf=filter==='all'||getStage(c.id)===filter;
+    return ms&&mf;
+  });
+  filtered=filtered.slice().sort((a,b)=>{
+    let av,bv;
+    if(ls2.sort==='name'){av=a.name.toLowerCase();bv=b.name.toLowerCase();return ls2.dir*(av<bv?-1:av>bv?1:0);}
+    if(ls2.sort==='debt'){return ls2.dir*(getEffDebt(b)-getEffDebt(a))*ls2.dir*ls2.dir;}
+    if(ls2.sort==='updated'){av=a.updatedDate||'';bv=b.updatedDate||'';return ls2.dir*(av<bv?-1:av>bv?1:0);}
+    return 0;
+  });
+  const opts=STAGES.map(s=>`<option value="${s.id}" ${filter===s.id?'selected':''}>${s.label}</option>`).join('');
+  const rows=filtered.length?filtered.map(c=>{
+    const cfg=getSC(getStage(c.id));
+    const d=daysSince(c.id);
+    return`<tr onclick="nav('detail','${c.id}')"><td><div style="font-weight:600">${c.name}</div></td><td><span style="font-weight:700;color:var(--accent);font-size:14px">${fmtM(getEffDebt(c))}</span></td><td><span class="badge" style="background:${cfg.bg};color:${cfg.color}">${cfg.label}</span></td><td style="font-size:13px;color:var(--text2)">${d!==null?(d===0?'Hôm nay':d+' ngày trước'):'—'}</td><td style="font-size:13px;color:var(--text2)">${fmtD(c.updatedDate)}</td></tr>`;
+  }).join(''):`<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text3)">Không tìm thấy</td></tr>`;
+  return`<div class="topbar"><div><div class="page-title">Khách hàng</div><div class="page-sub">${C.length} khách · ${filtered.length} hiển thị</div></div></div><div class="content"><div class="list-controls"><div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="csearch" placeholder="Tìm theo tên..." value="${search}" autocomplete="off"></div><select class="fsel" id="cfilt"><option value="all" ${filter==='all'?'selected':''}>Tất cả stage</option>${opts}</select></div><div class="card" style="overflow:hidden"><table class="ctable"><thead><tr><th onclick="setSort('name')" style="cursor:pointer">Khách hàng ${ls2.sort==='name'?(ls2.dir>0?'↑':'↓'):''}</th><th onclick="setSort('debt')" style="cursor:pointer">Dư nợ ${ls2.sort==='debt'?(ls2.dir>0?'↑':'↓'):'↓'}</th><th>Trạng thái</th><th>Liên hệ gần nhất</th><th onclick="setSort('updated')" style="cursor:pointer">Cập nhật Xero ${ls2.sort==='updated'?(ls2.dir>0?'↑':'↓'):''}</th></tr></thead><tbody id="ctbody">${rows}</tbody></table></div></div>`;
+}
+
+function rerenderRows(){
+  const C=loadC();const{search,filter}=ls2;
+  let filtered=C.filter(c=>{
+    const ms=!search||c.name.toLowerCase().includes(search.toLowerCase());
+    const mf=filter==='all'||getStage(c.id)===filter;
+    return ms&&mf;
+  });
+  filtered=filtered.slice().sort((a,b)=>{
+    if(ls2.sort==='name'){const av=a.name.toLowerCase(),bv=b.name.toLowerCase();return ls2.dir*(av<bv?-1:av>bv?1:0);}
+    if(ls2.sort==='debt')return ls2.dir*(getEffDebt(b)-getEffDebt(a))*ls2.dir*ls2.dir;
+    if(ls2.sort==='updated'){const av=a.updatedDate||'',bv=b.updatedDate||'';return ls2.dir*(av<bv?-1:av>bv?1:0);}
+    return 0;
+  });
+  const tb=document.getElementById('ctbody');if(!tb)return;
+  if(!filtered.length){tb.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text3)">Không tìm thấy</td></tr>`;return;}
+  tb.innerHTML=filtered.map(c=>{
+    const cfg=getSC(getStage(c.id));const d=daysSince(c.id);
+    return`<tr onclick="nav('detail','${c.id}')"><td><div style="font-weight:600">${c.name}</div></td><td><span style="font-weight:700;color:var(--accent);font-size:14px">${fmtM(getEffDebt(c))}</span></td><td><span class="badge" style="background:${cfg.bg};color:${cfg.color}">${cfg.label}</span></td><td style="font-size:13px;color:var(--text2)">${d!==null?(d===0?'Hôm nay':d+' ngày trước'):'—'}</td><td style="font-size:13px;color:var(--text2)">${fmtD(c.updatedDate)}</td></tr>`;
+  }).join('');
+}
+
+function setSort(col){
+  if(ls2.sort===col)ls2.dir*=-1;
+  else{ls2.sort=col;ls2.dir=col==='debt'?-1:1;}
+  render();
+}
+
+// ══════════════════════════════════════════════
+// DETAIL
+// ══════════════════════════════════════════════
+function rDetail(){
+  const c=loadC().find(x=>x.id===selId);if(!c)return rList();
+  const L=loadL()[c.id]||[];
+  const cfg=getSC(getStage(c.id));
+  const eff=getEffDebt(c);
+  const sbtns=STAGES.map(s=>{
+    const sel=fs.stage===s.id;
+    return`<button class="sbtn ${sel?'sel':''}" style="${sel?`background:${s.dot};color:#fff;border-color:${s.dot}`:''}" onclick="selStage('${s.id}')">${s.label}</button>`;
+  }).join('');
+  const isPaid=fs.stage==='paid';
+  const payAmt=Math.floor(parseFloat(fs.amount.replace(/\D/g,''))||0);
+  const rem=Math.floor(eff-payAmt);
+  const remHtml=isPaid&&payAmt>0?`<div class="rem ${rem<=0?'zero':'pos'}">${rem<=0?'✅ Đã tất toán hoàn toàn':`Còn lại: <strong>${fmtM(rem)}</strong>`}<div style="font-size:11px;margin-top:3px;opacity:.7">* Tạm tính — Xero là số chính thức</div></div>`:'';
+
+  const tlHtml=L.length?[...L].reverse().map(log=>{
+    const sc=getSC(log.stage);
+    if(editId===log.id){
+      return`<div class="tl-item" id="tl${log.id}"><div class="tl-dot" style="background:${sc.bg}">${sc.icon}</div><div class="tl-body"><div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">Chỉnh sửa log</div><select class="fi" id="es${log.id}" style="margin-bottom:8px">${STAGES.map(s=>`<option value="${s.id}" ${log.stage===s.id?'selected':''}>${s.label}</option>`).join('')}</select><input type="date" class="fi" id="ed${log.id}" value="${log.date}" style="margin-bottom:8px"><input type="text" class="fi" id="ea${log.id}" placeholder="Số tiền thu" value="${log.amount||''}" style="margin-bottom:8px"><textarea class="fi" id="en${log.id}" rows="2">${log.note||''}</textarea><div class="tl-btns"><button class="tl-btn" style="background:var(--text);color:#fff;border-color:var(--text)" onclick="saveEdit('${c.id}',${log.id})">💾 Lưu</button><button class="tl-btn" onclick="cancelEdit()">Hủy</button></div></div></div>`;
+    }
+    return`<div class="tl-item" id="tl${log.id}"><div class="tl-dot" style="background:${sc.bg}">${sc.icon}</div><div class="tl-body"><div class="tl-head"><span class="tl-action" style="color:${sc.color}">${sc.label}</span><span class="tl-date">${fmtD(log.date)}</span></div>${log.amount?`<div class="tl-amount">💵 Đã thu: ${fmtM(log.amount)}</div>`:''} ${log.note?`<div class="tl-note">${log.note}</div>`:''}<div class="tl-btns"><button class="tl-btn" onclick="startEdit(${log.id})">✏️ Sửa</button><button class="tl-btn del" onclick="delLog('${c.id}',${log.id})">🗑 Xóa</button></div></div></div>`;
+  }).join(''):`<div class="tl-empty">Chưa có hoạt động nào</div>`;
+
+  return`<div class="topbar"><div class="back" onclick="nav(prevView)">← Quay lại</div></div><div class="content"><div style="display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start">
+    <!-- CỘT TRÁI: Info + Ghi chú nội bộ -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card p24">
+        <div class="avatar">${c.name.charAt(0).toUpperCase()}</div>
+        <div class="cname-big">${c.name}</div>
+        <div style="margin-bottom:14px"><span class="badge" style="background:${cfg.bg};color:${cfg.color}">${cfg.label}</span></div>
+        <div class="irow"><span class="ilabel">Dư nợ hiệu lực</span><span class="debt-big">${fmtM(eff)}</span></div>
+        <div class="irow"><span class="ilabel">Nợ gốc (Xero)</span><span style="font-weight:500">${fmtM(c.debt)}</span></div>
+        <div class="irow"><span class="ilabel">Cập nhật Xero</span><span style="font-weight:500">${fmtD(c.updatedDate)}</span></div>
+        <div class="irow"><span class="ilabel">Số lần liên hệ</span><span style="font-weight:500">${L.length} lần</span></div>
+      </div>
+      <div class="card" style="padding:16px 20px">
+        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">📌 Ghi chú nội bộ</div>
+        <textarea class="fi" id="custNote" rows="3" placeholder="Khách hay quên, chỉ liên hệ buổi sáng..." style="margin-bottom:8px;font-size:13px">${loadN()[c.id]||''}</textarea>
+        <button onclick="saveNote('${c.id}')" style="padding:6px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);font-size:12px;font-weight:500;color:var(--text2)">💾 Lưu</button>
+      </div>
+    </div>
+    <!-- CỘT PHẢI: Form log (trên) + Timeline (dưới) -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card p24">
+        <div class="card-title" style="margin-bottom:16px">Ghi nhận hoạt động mới</div>
+        <div class="flabel">Trạng thái</div>
+        <div class="sbtns">${sbtns}</div>
+        <div class="flabel">Ngày</div>
+        <input type="date" class="fi" id="logDate" value="${fs.date}">
+        ${isPaid?`<div class="flabel">Số tiền đã thu ($)</div><input type="text" class="fi" id="logAmt" placeholder="Nhập số tiền..." value="${fs.amount}" autocomplete="off">${remHtml}`:''}
+        <div class="flabel">Ghi chú</div>
+        <textarea class="fi" id="logNote" placeholder="Phản hồi khách hàng...">${fs.note}</textarea>
+        <button class="sub-btn" onclick="submitLog('${c.id}')">💾 Lưu hoạt động</button>
+      </div>
+      <div class="card">
+        <div style="padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between">
+          <span class="card-title">Lịch sử hoạt động</span>
+          <span style="font-size:12px;color:var(--text3)">${L.length} hoạt động</span>
+        </div>
+        <div style="padding:20px 24px 24px" id="timeline">${tlHtml}</div>
+      </div>
+    </div>
+  </div></div>`;
+}
+
+// ══════════════════════════════════════════════
+// LOG ACTIONS
+// ══════════════════════════════════════════════
+async function saveNote(cid){
+  const val=document.getElementById('custNote')?.value||'';
+  await dbSaveNote(cid,val);
+  toast('Đã lưu ghi chú ✓');
+}
+
+function selStage(id){
+  // save current input values before re-render
+  fs.note=document.getElementById('logNote')?.value||fs.note;
+  fs.date=document.getElementById('logDate')?.value||fs.date;
+  fs.amount=document.getElementById('logAmt')?.value||fs.amount;
+  fs.stage=id; render();
+}
+
+async function submitLog(cid){
+  fs.date=document.getElementById('logDate')?.value||fs.date;
+  fs.note=document.getElementById('logNote')?.value||'';
+  fs.amount=document.getElementById('logAmt')?.value||'';
+  if(!fs.stage)return toast('Vui lòng chọn trạng thái!','err');
+  const amt=fs.stage==='paid'?Math.floor(parseFloat(fs.amount.replace(/\D/g,''))||0)||null:null;
+  const entry={id:Date.now(),date:fs.date,stage:fs.stage,note:fs.note,amount:amt};
+  await dbInsertLog(cid,entry);
+  fs.stage=null;fs.note='';fs.amount='';fs.date=today();
+  toast('Đã lưu ✓');render();
+  setTimeout(()=>document.getElementById('timeline')?.scrollIntoView({behavior:'smooth',block:'start'}),100);
+}
+
+function startEdit(id){editId=id;render();setTimeout(()=>document.getElementById('tl'+id)?.scrollIntoView({behavior:'smooth',block:'center'}),100);}
+function cancelEdit(){editId=null;render();}
+async function saveEdit(cid,id){
+  const stage=document.getElementById('es'+id)?.value;
+  const date=document.getElementById('ed'+id)?.value;
+  const amount=Math.floor(parseFloat((document.getElementById('ea'+id)?.value||'').replace(/\D/g,''))||0)||null;
+  const note=document.getElementById('en'+id)?.value||'';
+  await dbUpdateLog(cid,id,{stage,date,amount,note});
+  editId=null;toast('Đã cập nhật ✓');render();
+}
+function delLog(cid,id){
+  confirm2('Xóa log này?','Hành động không thể hoàn tác.',async()=>{
+    await dbDeleteLog(cid,id);toast('Đã xóa ✓');render();
+  });
+}
+
+// ══════════════════════════════════════════════
+// IMPORT
+// ══════════════════════════════════════════════
+function rImport(){
+  const ph=prevData?rPreview(prevData):'';
+  return`<div class="topbar"><div><div class="page-title">Import từ Xero</div><div class="page-sub">Upload file Aged Receivables Summary (.xlsx)</div></div></div><div class="content"><div class="card" style="padding:24px;max-width:820px"><div class="izone" id="izone" onclick="document.getElementById('fInput').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="onDrop(event)"><div style="font-size:36px;margin-bottom:12px">📄</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">Kéo thả hoặc click để chọn file</div><div style="font-size:13px;color:var(--text2)">File .xlsx từ Xero · Aged Receivables Summary</div><input type="file" id="fInput" accept=".xlsx,.xls" style="display:none" onchange="onFile(event)"></div>${ph}</div><div class="card mt16" style="padding:16px 24px;max-width:820px;font-size:13px;color:var(--text2)"><strong>Lưu ý:</strong> Nợ = Total − Current · Debt &lt; 1 bỏ qua · Trùng tên: giữ log, cập nhật nợ · Đã thanh toán mà Xero vẫn còn nợ → reset stage</div></div>`;
+}
+
+function rPreview(data){
+  const nw=data.filter(r=>r.status==='new').length;
+  const up=data.filter(r=>r.status==='update').length;
+  const rs=data.filter(r=>r.reset).length;
+  const rows=data.map(r=>`<tr class="${r.status}"><td>${r.name}</td><td style="font-weight:700;color:var(--accent)">${fmtM(r.debt)}</td><td style="color:var(--text2)">${fmtM(r.current)}</td><td style="color:var(--text2)">${fmtM(r.total)}</td><td><span class="pbadge ${r.status}">${r.status==='new'?'✨ Mới':r.status==='update'?'🔄 Cập nhật':'— Giữ nguyên'}</span>${r.reset?' <span class="pbadge" style="background:#FEE8E2;color:#C84B2F">↺ Reset</span>':''}</td></tr>`).join('');
+  return`<div style="margin-top:20px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div style="font-size:13px;color:var(--text2)"><strong>${data.length}</strong> khách · <span style="color:var(--green)">✨${nw} mới</span> · <span style="color:var(--yellow)">🔄${up} cập nhật</span>${rs?` · <span style="color:var(--accent)">↺${rs} reset</span>`:''}</div><button onclick="doImport()" style="padding:9px 20px;background:var(--text);color:#fff;border-radius:var(--r);font-size:13px;font-weight:600">✅ Xác nhận Import</button></div><div style="max-height:360px;overflow:auto;border:1px solid var(--border);border-radius:var(--r)"><table class="ptable"><thead><tr><th>Tên</th><th>Nợ QH</th><th>Current</th><th>Total</th><th>Trạng thái</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+
+function onDrop(e){e.preventDefault();document.getElementById('izone')?.classList.remove('drag');if(e.dataTransfer.files[0])processFile(e.dataTransfer.files[0]);}
+function onFile(e){if(e.target.files[0])processFile(e.target.files[0]);}
+
+function processFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+      // extract xero date
+      let xDate=today();
+      for(let i=0;i<5;i++){
+        const row=rows[i];if(!row)continue;
+        const cell=row.find(c=>c&&c.toString().toLowerCase().includes('as at'));
+        if(cell){
+          const m=cell.toString().match(/(\d{1,2})\s+(\w+)\s+(\d{4})/);
+          if(m){
+            const mos={'january':1,'february':2,'march':3,'april':4,'may':5,'june':6,'july':7,'august':8,'september':9,'october':10,'november':11,'december':12};
+            const mo=mos[m[2].toLowerCase()];
+            if(mo){xDate=`${m[3]}-${String(mo).padStart(2,'0')}-${String(parseInt(m[1])).padStart(2,'0')}`;}
+          }
+          break;
+        }
+      }
+      // find header
+      let hi=-1;
+      for(let i=0;i<rows.length;i++){if(rows[i]?.some(c=>c?.toString().toLowerCase().includes('contact'))){hi=i;break;}}
+      if(hi===-1)return toast('Không tìm thấy header!','err');
+      const heads=rows[hi].map(h=>h?.toString().toLowerCase().trim()||'');
+      const ci=heads.findIndex(h=>h==='contact');
+      const uri=heads.findIndex(h=>h==='current');
+      const ti=heads.findIndex(h=>h.includes('total'));
+      if(ci===-1||ti===-1)return toast('File không đúng định dạng!','err');
+      const C=loadC();const em={};C.forEach(c=>em[c.name.toLowerCase().trim()]=c);
+      const prev=[];
+      for(let i=hi+1;i<rows.length;i++){
+        const row=rows[i];if(!row||!row[ci])continue;
+        const name=row[ci].toString().trim();if(!name)continue;
+        const cur=Math.floor(parseFloat(row[uri])||0);
+        const tot=Math.floor(parseFloat(row[ti])||0);
+        const debt=Math.max(0,tot-cur);
+        if(debt<1)continue;
+        const ex=em[name.toLowerCase()];
+        const reset=ex&&getStage(ex.id)==='paid'&&debt>=1;
+        const status=!ex?'new':(ex.debt!==debt?'update':'keep');
+        prev.push({name,debt,current:cur,total:tot,status,reset,xDate});
+      }
+      if(!prev.length)return toast('Không có dữ liệu hợp lệ!','err');
+      prevData=prev;render();
+    }catch(err){toast('Lỗi: '+err.message,'err');}
+  };
+  r.readAsArrayBuffer(file);
+}
+
+async function doImport(){
+  if(!prevData)return;
+  toast('Đang import...','ok');
+  const C=loadC();const em={};C.forEach(c=>em[c.name.toLowerCase().trim()]=c);
+  for(const row of prevData){
+    const key=row.name.toLowerCase().trim();
+    if(em[key]){
+      em[key].debt=row.debt;em[key].updatedDate=row.xDate;
+      await dbUpsertCustomer(em[key]);
+      if(row.reset){
+        const entry={id:Date.now()+Math.floor(Math.random()*1000),date:row.xDate,stage:'none',note:'Auto-reset: Xero vẫn còn nợ',amount:null};
+        await dbInsertLog(em[key].id,entry);
+      }
+    }else{
+      const nc={id:'C'+Date.now()+Math.random().toString(36).slice(2,5),name:row.name,debt:row.debt,importDate:row.xDate,updatedDate:row.xDate};
+      _customers.push(nc);em[key]=nc;
+      await dbUpsertCustomer(nc);
+    }
+  }
+  prevData=null;toast('Import thành công ✓');nav('dashboard');
+}
+
+// ══════════════════════════════════════════════
+// BACKUP / EXPORT
+// ══════════════════════════════════════════════
+function exportBackup(){
+  dl(JSON.stringify({version:3,exportedAt:new Date().toISOString(),customers:_customers,logs:_logs,notes:_notes},null,2),`debtcrm_backup_${today()}.json`,'application/json');
+  toast('Backup xong ✓');
+}
+function importBackup(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=async ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!d.customers)return toast('File không hợp lệ!','err');
+      toast('Đang restore...','ok');
+      for(const c of d.customers) await dbUpsertCustomer(c);
+      for(const [cid,logs] of Object.entries(d.logs||{}))
+        for(const l of logs) await dbInsertLog(cid,l).catch(()=>{});
+      for(const [cid,content] of Object.entries(d.notes||{})) await dbSaveNote(cid,content);
+      await loadAll();toast('Restore xong ✓');render();
+    }catch(err){toast('Lỗi: '+err.message,'err');}
+  };
+  r.readAsText(file);
+}
+function exportCSV(){
+  const C=loadC(),L=loadL();
+  const rows=[['ID','Tên','Nợ Xero','Nợ hiệu lực','Stage','Số lần liên hệ','Cập nhật Xero']];
+  C.forEach(c=>{const cfg=getSC(getStage(c.id));rows.push([c.id,c.name,c.debt,getEffDebt(c),cfg.label,(L[c.id]||[]).length,c.updatedDate||'']);});
+  dl('\uFEFF'+rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n'),`debtcrm_${today()}.csv`,'text/csv;charset=utf-8');
+  toast('Xuất CSV xong ✓');
+}
+function dl(content,name,type){const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([content],{type})),download:name});a.click();}
+
+// ══════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════
+function toast(msg,type='ok'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.style.background=type==='err'?'#C0392B':'#1A1714';el.style.color='#fff';el.style.display='block';
+  clearTimeout(window._tt);window._tt=setTimeout(()=>el.style.display='none',3000);
+}
+function confirm2(title,body,cb){
+  document.getElementById('mroot').innerHTML=`<div class="overlay" onclick="closeM()"><div class="modal" onclick="event.stopPropagation()"><div class="modal-title">${title}</div><div style="font-size:13px;color:var(--text2)">${body}</div><div class="mbtns"><button class="mbtn cancel" onclick="closeM()">Hủy</button><button class="mbtn danger" id="cbtn">Xóa</button></div></div></div>`;
+  document.getElementById('cbtn').onclick=()=>{closeM();cb();};
+}
+function closeM(){document.getElementById('mroot').innerHTML='';}
+
+// ══════════════════════════════════════════════
+// BIND — no re-render on input (fix focus bug)
+// ══════════════════════════════════════════════
+function bind(){
+  const cs=document.getElementById('csearch');
+  if(cs){
+    cs.addEventListener('input',e=>{
+      ls2.search=e.target.value;
+      clearTimeout(window._st);
+      window._st=setTimeout(rerenderRows,120);
+    });
+  }
+  const cf=document.getElementById('cfilt');
+  if(cf)cf.addEventListener('change',e=>{ls2.filter=e.target.value;rerenderRows();});
+
+  const la=document.getElementById('logAmt');
+  if(la){
+    la.addEventListener('input',e=>{
+      fs.amount=e.target.value;
+      updateRem();
+    });
+  }
+  const ln=document.getElementById('logNote');
+  if(ln)ln.addEventListener('input',e=>fs.note=e.target.value);
+  const ld=document.getElementById('logDate');
+  if(ld)ld.addEventListener('change',e=>fs.date=e.target.value);
+}
+
+function updateRem(){
+  const c=loadC().find(x=>x.id===selId);if(!c||fs.stage!=='paid')return;
+  const payAmt=Math.floor(parseFloat(fs.amount.replace(/\D/g,''))||0);
+  const rem=Math.floor(getEffDebt(c)-payAmt);
+  const html=`<div class="rem ${rem<=0?'zero':'pos'}">${rem<=0?'✅ Đã tất toán hoàn toàn':`Còn lại: <strong>${fmtM(rem)}</strong>`}<div style="font-size:11px;margin-top:3px;opacity:.7">* Tạm tính — Xero là số chính thức</div></div>`;
+  const existing=document.querySelector('.rem');
+  if(existing)existing.outerHTML=html;
+  else document.getElementById('logAmt')?.insertAdjacentHTML('afterend',html);
+}
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+(async()=>{
+  document.getElementById('main').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:60vh;flex-direction:column;gap:12px;color:var(--text3)"><div style="font-size:32px">⏳</div><div style="font-size:14px">Đang tải dữ liệu...</div></div>';
+  try{
+    await loadAll();
+  }catch(err){
+    toast('Lỗi kết nối Supabase: '+err.message,'err');
+  }
+  render();
+})();
+</script>
+</body>
+</html>
