@@ -628,6 +628,8 @@ async function doImport(){
   if(!prevData)return;
   toast('Đang import...','ok');
   const C=loadC();const em={};C.forEach(c=>em[c.name.toLowerCase().trim()]=c);
+  const importedKeys=new Set(prevData.map(r=>r.name.toLowerCase().trim()));
+
   for(const row of prevData){
     const key=row.name.toLowerCase().trim();
     if(em[key]){
@@ -643,6 +645,30 @@ async function doImport(){
       await dbUpsertCustomer(nc);
     }
   }
+
+  // Auto mark paid: KH có trong CRM nhưng không còn trong Xero
+  for(const c of C){
+    const key=c.name.toLowerCase().trim();
+    if(!importedKeys.has(key)){
+      const stage=getStage(c.id);
+      // Chỉ xử lý những KH đang active (chưa paid)
+      if(stage!=='paid'){
+        const debtAmt=c.debt||0;
+        const entry={
+          id:Date.now()+Math.floor(Math.random()*9999),
+          date:prevData[0]?.xDate||today(),
+          stage:'paid',
+          amount:debtAmt,
+          note:`Auto: không còn trong Xero ngày ${prevData[0]?.xDate||today()}`
+        };
+        await dbInsertLog(c.id,entry);
+        // Set debt về 0 trên Supabase
+        c.debt=0;c.updatedDate=prevData[0]?.xDate||today();
+        await dbUpsertCustomer(c);
+      }
+    }
+  }
+
   prevData=null;toast('Import thành công ✓');nav('dashboard');
 }
 
