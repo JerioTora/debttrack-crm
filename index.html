@@ -154,6 +154,57 @@
   .empty-title{font-size:16px;font-weight:600;color:var(--text2);margin-bottom:6px}
   .mt16{margin-top:16px}
   .p24{padding:24px}
+
+  .mobile-tools{display:none}
+  /* ── RESPONSIVE MOBILE ── */
+  @media (max-width: 768px) {
+    .app{flex-direction:column}
+    .sidebar{width:100%;height:auto;flex-direction:row;align-items:center;padding:0;position:fixed;bottom:0;left:0;right:0;z-index:50;border-top:1px solid rgba(255,255,255,.1)}
+    .sb-logo{display:none}
+    .sb-nav{display:flex;flex-direction:row;padding:0;gap:0;justify-content:space-around;flex:1}
+    .nav-item{flex-direction:column;gap:3px;font-size:10px;padding:10px 8px;border-radius:0;margin:0;flex:1;justify-content:center;text-align:center}
+    .nav-item span{font-size:20px}
+    .nav-item.active{background:transparent;color:#fff;border-top:2px solid var(--accent)}
+    .sb-footer{display:none}
+    .main{padding-bottom:70px;overflow:auto}
+    .topbar{padding:16px 16px 0}
+    .page-title{font-size:22px}
+    .content{padding:16px 16px 24px}
+    /* Stats: 2 cols */
+    .stats-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+    .stats-grid .stat-card:last-child{grid-column:span 2}
+    .stat-num{font-size:24px}
+    /* Kanban: horizontal scroll */
+    .kanban{display:flex;overflow-x:auto;gap:10px;padding-bottom:8px;scroll-snap-type:x mandatory}
+    .kanban::-webkit-scrollbar{height:3px}
+    .kb-col{min-width:200px;max-width:200px;scroll-snap-align:start;flex-shrink:0}
+    /* List: hide less important cols */
+    .ctable th:nth-child(4),
+    .ctable td:nth-child(4),
+    .ctable th:nth-child(5),
+    .ctable td:nth-child(5),
+    .ctable th:nth-child(6),
+    .ctable td:nth-child(6){display:none}
+    .ctable th,.ctable td{padding:10px 10px}
+    /* Detail: stack vertical */
+    .dgrid,.detail-two-col{grid-template-columns:1fr!important}
+    /* Form */
+    .sbtns{gap:5px}
+    .sbtn{font-size:11px;padding:6px 10px}
+    /* Back button */
+    .back{margin-bottom:12px}
+    /* Import */
+    .mobile-tools{display:flex!important}
+    .izone{padding:24px 16px}
+    /* Modal */
+    .modal{width:95vw;padding:20px}
+    /* Card padding */
+    .p24{padding:16px}
+  }
+  @media (max-width: 400px) {
+    .stats-grid{grid-template-columns:1fr 1fr}
+    .nav-item{font-size:9px;padding:8px 4px}
+  }
 </style>
 </head>
 <body>
@@ -161,9 +212,9 @@
   <div class="sidebar">
     <div class="sb-logo"><div class="title">DebtTrack</div><div class="sub">Mini CRM · Công nợ</div></div>
     <nav class="sb-nav">
-      <div class="nav-item active" onclick="nav('dashboard')" id="nav-dashboard"><span>📊</span> Tổng quan</div>
-      <div class="nav-item" onclick="nav('customers')" id="nav-customers"><span>👥</span> Khách hàng</div>
-      <div class="nav-item" onclick="nav('import')" id="nav-import"><span>📥</span> Import Xero</div>
+      <div class="nav-item active" onclick="nav('dashboard')" id="nav-dashboard"><span>📊</span> <span class="nav-label">Tổng quan</span></div>
+      <div class="nav-item" onclick="nav('customers')" id="nav-customers"><span>👥</span> <span class="nav-label">Khách hàng</span></div>
+      <div class="nav-item" onclick="nav('import')" id="nav-import"><span>📥</span> <span class="nav-label">Import</span></div>
     </nav>
     <div class="sb-footer">
       <button class="sb-btn" onclick="exportBackup()">💾 Backup JSON</button>
@@ -472,7 +523,7 @@ function rDetail(){
     return`<div class="tl-item" id="tl${log.id}"><div class="tl-dot" style="background:${sc.bg}">${sc.icon}</div><div class="tl-body"><div class="tl-head"><span class="tl-action" style="color:${sc.color}">${sc.label}</span><span class="tl-date">${fmtD(log.date)}</span></div>${log.amount?`<div class="tl-amount">💵 Đã thu: ${fmtM(log.amount)}</div>`:''} ${log.note?`<div class="tl-note">${log.note}</div>`:''}<div class="tl-btns"><button class="tl-btn" onclick="startEdit(${log.id})">✏️ Sửa</button><button class="tl-btn del" onclick="delLog('${c.id}',${log.id})">🗑 Xóa</button></div></div></div>`;
   }).join(''):`<div class="tl-empty">Chưa có hoạt động nào</div>`;
 
-  return`<div class="topbar"><div class="back" onclick="nav(prevView)">← Quay lại</div></div><div class="content"><div style="display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start">
+  return`<div class="topbar"><div class="back" onclick="nav(prevView)">← Quay lại</div></div><div class="content"><div class="detail-two-col" style="display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start">
     <!-- CỘT TRÁI: Info + Ghi chú nội bộ -->
     <div style="display:flex;flex-direction:column;gap:16px">
       <div class="card p24">
@@ -566,7 +617,12 @@ function delLog(cid,id){
 // ══════════════════════════════════════════════
 function rImport(){
   const ph=prevData?rPreview(prevData):'';
-  return`<div class="topbar"><div><div class="page-title">Import từ Xero</div><div class="page-sub">Upload file Aged Receivables Summary (.xlsx)</div></div></div><div class="content"><div class="card" style="padding:24px;max-width:820px"><div class="izone" id="izone" onclick="document.getElementById('fInput').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="onDrop(event)"><div style="font-size:36px;margin-bottom:12px">📄</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">Kéo thả hoặc click để chọn file</div><div style="font-size:13px;color:var(--text2)">File .xlsx từ Xero · Aged Receivables Summary</div><input type="file" id="fInput" accept=".xlsx,.xls" style="display:none" onchange="onFile(event)"></div>${ph}</div><div class="card mt16" style="padding:16px 24px;max-width:820px;font-size:13px;color:var(--text2)"><strong>Lưu ý:</strong> Nợ = Total − Current · Debt &lt; 1 bỏ qua · Trùng tên: giữ log, cập nhật nợ · Đã thanh toán mà Xero vẫn còn nợ → reset stage</div></div>`;
+  const mobileTools=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px" class="mobile-tools">
+    <button class="sb-btn" onclick="exportBackup()" style="background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:var(--r)">💾 Backup</button>
+    <label class="sb-btn" style="cursor:pointer;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:var(--r)">📂 Restore<input type="file" accept=".json" onchange="importBackup(event)" style="display:none"></label>
+    <button class="sb-btn" onclick="exportCSV()" style="background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:var(--r)">📤 CSV</button>
+  </div>`;
+  return`<div class="topbar"><div><div class="page-title">Import từ Xero</div><div class="page-sub">Upload file Aged Receivables Summary (.xlsx)</div></div></div><div class="content">${mobileTools}<div class="card" style="padding:24px;max-width:820px"><div class="izone" id="izone" onclick="document.getElementById('fInput').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="onDrop(event)"><div style="font-size:36px;margin-bottom:12px">📄</div><div style="font-size:15px;font-weight:600;margin-bottom:6px">Kéo thả hoặc click để chọn file</div><div style="font-size:13px;color:var(--text2)">File .xlsx từ Xero · Aged Receivables Summary</div><input type="file" id="fInput" accept=".xlsx,.xls" style="display:none" onchange="onFile(event)"></div>${ph}</div><div class="card mt16" style="padding:16px 24px;max-width:820px;font-size:13px;color:var(--text2)"><strong>Lưu ý:</strong> Nợ = Total − Current · Debt &lt; 1 bỏ qua · Trùng tên: giữ log, cập nhật nợ · Đã thanh toán mà Xero vẫn còn nợ → reset stage</div></div>`;
 }
 
 function rPreview(data){
