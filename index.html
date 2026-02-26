@@ -214,7 +214,7 @@ async function loadAll() {
     _supa.from('logs').select('*').order('created_at'),
     _supa.from('notes').select('*'),
   ]);
-  _customers = cRes.data || [];
+  _customers = (cRes.data || []).map(c=>({...c, totalDebt: c.total_debt||c.debt||0}));
   _logs = {};
   (lRes.data || []).forEach(l => {
     if (!_logs[l.customer_id]) _logs[l.customer_id] = [];
@@ -241,6 +241,7 @@ async function saveC(data) { _customers = data; }
 async function dbUpsertCustomer(c) {
   await _supa.from('customers').upsert({
     id: c.id, name: c.name, debt: c.debt,
+    total_debt: c.totalDebt||c.debt||0,
     import_date: c.importDate||null,
     updated_date: c.updatedDate||null,
   }, {onConflict: 'id'});
@@ -288,11 +289,16 @@ function getStage(id){
 }
 function getSC(id){return STAGES.find(s=>s.id===id)||STAGES[0]}
 function getEffDebt(c){
-  const today=dStr(new Date());
+  // dư nợ quá hạn (overdue) sau khi trừ thanh toán trong ngày
+  const t=dStr(new Date());
   const paid=(loadL()[c.id]||[])
-    .filter(l=>l.date===today&&l.stage==='paid'&&l.amount)
+    .filter(l=>l.date===t&&l.stage==='paid'&&l.amount)
     .reduce((s,l)=>s+(l.amount||0),0);
   return Math.max(0,Math.floor(c.debt-paid));
+}
+function getTotalDebt(c){
+  // tổng dư nợ (total = overdue + current)
+  return Math.floor(c.totalDebt||c.debt||0);
 }
 function fmtM(n){
   if(n===null||n===undefined)return'—';
@@ -356,7 +362,8 @@ function rDash(){
   const paidToday=C.filter(c=>(loadL()[c.id]||[]).some(l=>l.stage==='paid'&&l.date===t));
   const sc={};STAGES.forEach(s=>sc[s.id]=0);
   active.forEach(c=>sc[getStage(c.id)]++);
-  const totalDebt=active.reduce((s,c)=>s+getEffDebt(c),0);
+  const totalOverdue=active.reduce((s,c)=>s+getEffDebt(c),0);
+  const totalAll=active.reduce((s,c)=>s+getTotalDebt(c),0);
   const L_all=loadL();
   const paidTodayAmt=paidToday.reduce((s,c)=>s+(L_all[c.id]||[]).filter(l=>l.stage==='paid'&&l.date===t&&l.amount).reduce((a,l)=>a+(l.amount||0),0),0);
 
@@ -364,7 +371,7 @@ function rDash(){
     <div class="stat-card s0"><div class="stat-num">${sc.none}</div><div class="stat-label">Chưa xử lý</div><div class="stat-sub">Cần bắt đầu</div></div>
     <div class="stat-card s1"><div class="stat-num">${sc.sms1+sc.sms2}</div><div class="stat-label">Đang nhắn tin</div><div class="stat-sub">L1:${sc.sms1} · L2:${sc.sms2}</div></div>
     <div class="stat-card s2"><div class="stat-num">${sc.report+sc.called}</div><div class="stat-label">Sale xử lý</div><div class="stat-sub">Báo:${sc.report} · Gọi:${sc.called}</div></div>
-    <div class="stat-card s3"><div class="stat-num" style="font-size:22px">${fmtM(totalDebt)}</div><div class="stat-label">Tổng dư nợ</div><div class="stat-sub">${active.length} khách chưa thu</div></div>
+    <div class="stat-card s3"><div class="stat-num" style="font-size:20px">${fmtM(totalOverdue)}</div><div class="stat-label">Dư nợ quá hạn</div><div class="stat-sub">Tổng dư nợ: ${fmtM(totalAll)}</div></div>
     <div class="stat-card s4"><div class="stat-num">${paidToday.length}</div><div class="stat-label">Thanh toán hôm nay</div><div class="stat-sub">${fmtM(paidTodayAmt)}</div></div>
   </div>`;
 
@@ -374,7 +381,7 @@ function rDash(){
       const d=daysSince(c.id);
       const stale=d!==null&&d>3;
       const dh=d!==null?`<span class="kc-days" style="background:${stale?'#FEE8E2':'#F0EDE8'};color:${stale?'#C84B2F':'#6B6560'}">${d===0?'Hôm nay':d+'n trước'}</span>`:`<span class="kc-days" style="background:#F0EDE8;color:#9E9892">Mới</span>`;
-      return`<div class="kb-card" onclick="nav('detail','${c.id}')"><div class="kc-name">${c.name}</div><div class="kc-debt">${fmtM(getEffDebt(c))}</div>${dh}</div>`;
+      return`<div class="kb-card" onclick="nav('detail','${c.id}')"><div class="kc-name">${c.name}</div><div class="kc-debt">${fmtM(getEffDebt(c))}</div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Tổng: ${fmtM(getTotalDebt(c))}</div>${dh}</div>`;
     }).join(''):`<div style="padding:12px;text-align:center;font-size:12px;color:var(--text3)">Không có</div>`;
     return`<div class="kb-col s${i}"><div class="kb-head"><span class="kb-title">${st.label}</span><span class="kb-count">${cc.length}</span></div><div class="kb-body">${cards}</div></div>`;
   });
@@ -408,9 +415,9 @@ function rList(){
   const rows=filtered.length?filtered.map(c=>{
     const cfg=getSC(getStage(c.id));
     const d=daysSince(c.id);
-    return`<tr onclick="nav('detail','${c.id}')"><td><div style="font-weight:600">${c.name}</div></td><td><span style="font-weight:700;color:var(--accent);font-size:14px">${fmtM(getEffDebt(c))}</span></td><td><span class="badge" style="background:${cfg.bg};color:${cfg.color}">${cfg.label}</span></td><td style="font-size:13px;color:var(--text2)">${d!==null?(d===0?'Hôm nay':d+' ngày trước'):'—'}</td><td style="font-size:13px;color:var(--text2)">${fmtD(c.updatedDate)}</td></tr>`;
-  }).join(''):`<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text3)">Không tìm thấy</td></tr>`;
-  return`<div class="topbar"><div><div class="page-title">Khách hàng</div><div class="page-sub">${C.length} khách · ${filtered.length} hiển thị</div></div></div><div class="content"><div class="list-controls"><div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="csearch" placeholder="Tìm theo tên..." value="${search}" autocomplete="off"></div><select class="fsel" id="cfilt"><option value="all" ${filter==='all'?'selected':''}>Tất cả stage</option>${opts}</select></div><div class="card" style="overflow:hidden"><table class="ctable"><thead><tr><th onclick="setSort('name')" style="cursor:pointer">Khách hàng ${ls2.sort==='name'?(ls2.dir>0?'↑':'↓'):''}</th><th onclick="setSort('debt')" style="cursor:pointer">Dư nợ ${ls2.sort==='debt'?(ls2.dir>0?'↑':'↓'):'↓'}</th><th>Trạng thái</th><th>Liên hệ gần nhất</th><th onclick="setSort('updated')" style="cursor:pointer">Cập nhật Xero ${ls2.sort==='updated'?(ls2.dir>0?'↑':'↓'):''}</th></tr></thead><tbody id="ctbody">${rows}</tbody></table></div></div>`;
+    return`<tr onclick="nav('detail','${c.id}')"><td><div style="font-weight:600">${c.name}</div></td><td><span style="font-weight:700;color:var(--accent);font-size:14px">${fmtM(getEffDebt(c))}</span></td><td><span style="font-weight:600;color:var(--text2);font-size:13.5px">${fmtM(getTotalDebt(c))}</span></td><td><span class="badge" style="background:${cfg.bg};color:${cfg.color}">${cfg.label}</span></td><td style="font-size:13px;color:var(--text2)">${d!==null?(d===0?'Hôm nay':d+' ngày trước'):'—'}</td><td style="font-size:13px;color:var(--text2)">${fmtD(c.updatedDate)}</td></tr>`;
+  }).join(''):`<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text3)">Không tìm thấy</td></tr>`;
+  return`<div class="topbar"><div><div class="page-title">Khách hàng</div><div class="page-sub">${C.length} khách · ${filtered.length} hiển thị</div></div></div><div class="content"><div class="list-controls"><div class="search-wrap"><span class="search-icon">🔍</span><input type="text" id="csearch" placeholder="Tìm theo tên..." value="${search}" autocomplete="off"></div><select class="fsel" id="cfilt"><option value="all" ${filter==='all'?'selected':''}>Tất cả stage</option>${opts}</select></div><div class="card" style="overflow:hidden"><table class="ctable"><thead><tr><th onclick="setSort('name')" style="cursor:pointer">Khách hàng ${ls2.sort==='name'?(ls2.dir>0?'↑':'↓'):''}</th><th onclick="setSort('debt')" style="cursor:pointer">Nợ quá hạn ${ls2.sort==='debt'?(ls2.dir>0?'↑':'↓'):'↓'}</th><th>Tổng dư nợ</th><th>Trạng thái</th><th>Liên hệ gần nhất</th><th onclick="setSort('updated')" style="cursor:pointer">Cập nhật Xero ${ls2.sort==='updated'?(ls2.dir>0?'↑':'↓'):''}</th></tr></thead><tbody id="ctbody">${rows}</tbody></table></div></div>`;
 }
 
 function rerenderRows(){
@@ -430,7 +437,7 @@ function rerenderRows(){
   if(!filtered.length){tb.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text3)">Không tìm thấy</td></tr>`;return;}
   tb.innerHTML=filtered.map(c=>{
     const cfg=getSC(getStage(c.id));const d=daysSince(c.id);
-    return`<tr onclick="nav('detail','${c.id}')"><td><div style="font-weight:600">${c.name}</div></td><td><span style="font-weight:700;color:var(--accent);font-size:14px">${fmtM(getEffDebt(c))}</span></td><td><span class="badge" style="background:${cfg.bg};color:${cfg.color}">${cfg.label}</span></td><td style="font-size:13px;color:var(--text2)">${d!==null?(d===0?'Hôm nay':d+' ngày trước'):'—'}</td><td style="font-size:13px;color:var(--text2)">${fmtD(c.updatedDate)}</td></tr>`;
+    return`<tr onclick="nav('detail','${c.id}')"><td><div style="font-weight:600">${c.name}</div></td><td><span style="font-weight:700;color:var(--accent);font-size:14px">${fmtM(getEffDebt(c))}</span></td><td><span style="font-weight:600;color:var(--text2);font-size:13.5px">${fmtM(getTotalDebt(c))}</span></td><td><span class="badge" style="background:${cfg.bg};color:${cfg.color}">${cfg.label}</span></td><td style="font-size:13px;color:var(--text2)">${d!==null?(d===0?'Hôm nay':d+' ngày trước'):'—'}</td><td style="font-size:13px;color:var(--text2)">${fmtD(c.updatedDate)}</td></tr>`;
   }).join('');
 }
 
@@ -472,8 +479,9 @@ function rDetail(){
         <div class="avatar">${c.name.charAt(0).toUpperCase()}</div>
         <div class="cname-big">${c.name}</div>
         <div style="margin-bottom:14px"><span class="badge" style="background:${cfg.bg};color:${cfg.color}">${cfg.label}</span></div>
-        <div class="irow"><span class="ilabel">Dư nợ hiệu lực</span><span class="debt-big">${fmtM(eff)}</span></div>
-        <div class="irow"><span class="ilabel">Nợ gốc (Xero)</span><span style="font-weight:500">${fmtM(c.debt)}</span></div>
+        <div class="irow"><span class="ilabel">Dư nợ quá hạn</span><span class="debt-big">${fmtM(eff)}</span></div>
+        <div class="irow"><span class="ilabel">Tổng dư nợ</span><span style="font-weight:600;font-size:16px;color:var(--text)">${fmtM(getTotalDebt(c))}</span></div>
+        <div class="irow"><span class="ilabel">Nợ hiện hành</span><span style="font-weight:500">${fmtM(Math.max(0,getTotalDebt(c)-Math.floor(c.debt||0)))}</span></div>
         <div class="irow"><span class="ilabel">Cập nhật Xero</span><span style="font-weight:500">${fmtD(c.updatedDate)}</span></div>
         <div class="irow"><span class="ilabel">Số lần liên hệ</span><span style="font-weight:500">${L.length} lần</span></div>
       </div>
@@ -615,7 +623,7 @@ function processFile(file){
         const ex=em[name.toLowerCase()];
         const reset=ex&&getStage(ex.id)==='paid'&&debt>=1;
         const status=!ex?'new':(ex.debt!==debt?'update':'keep');
-        prev.push({name,debt,current:cur,total:tot,status,reset,xDate});
+        prev.push({name,debt,totalDebt:tot,current:cur,total:tot,status,reset,xDate});
       }
       if(!prev.length)return toast('Không có dữ liệu hợp lệ!','err');
       prevData=prev;render();
@@ -633,14 +641,14 @@ async function doImport(){
   for(const row of prevData){
     const key=row.name.toLowerCase().trim();
     if(em[key]){
-      em[key].debt=row.debt;em[key].updatedDate=row.xDate;
+      em[key].debt=row.debt;em[key].totalDebt=row.totalDebt||row.debt;em[key].updatedDate=row.xDate;
       await dbUpsertCustomer(em[key]);
       if(row.reset){
         const entry={id:Date.now()+Math.floor(Math.random()*1000),date:row.xDate,stage:'none',note:'Auto-reset: Xero vẫn còn nợ',amount:null};
         await dbInsertLog(em[key].id,entry);
       }
     }else{
-      const nc={id:'C'+Date.now()+Math.random().toString(36).slice(2,5),name:row.name,debt:row.debt,importDate:row.xDate,updatedDate:row.xDate};
+      const nc={id:'C'+Date.now()+Math.random().toString(36).slice(2,5),name:row.name,debt:row.debt,totalDebt:row.totalDebt||row.debt,importDate:row.xDate,updatedDate:row.xDate};
       _customers.push(nc);em[key]=nc;
       await dbUpsertCustomer(nc);
     }
